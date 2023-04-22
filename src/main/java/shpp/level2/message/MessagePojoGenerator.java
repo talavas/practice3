@@ -2,13 +2,18 @@ package shpp.level2.message;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import java.time.LocalDateTime;
 import java.util.Random;
 
 
 public class MessagePojoGenerator {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    static {
+        objectMapper.registerModule(new JavaTimeModule());
+    }
     private static final Random random = new Random();
 
     private static final int MAX_LENGTH = 10;
@@ -23,7 +28,8 @@ public class MessagePojoGenerator {
     public static MessagePojo generateMessage(){
         return new MessagePojo(
               generateRandomString(MAX_LENGTH),
-                random.nextInt(MAX_COUNT)
+                random.nextInt(MAX_COUNT),
+                LocalDateTime.now()
         );
     }
     private  static String generateRandomString(int length) {

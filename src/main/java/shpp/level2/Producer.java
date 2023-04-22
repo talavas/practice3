@@ -4,7 +4,6 @@ import org.apache.activemq.util.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import shpp.level2.message.MessageStream;
-import shpp.level2.util.Config;
 import shpp.level2.util.ConnectionMQ;
 
 import javax.jms.*;
@@ -15,24 +14,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Producer implements Runnable{
     private static final Logger logger = LoggerFactory.getLogger(Producer.class);
 
-    BlockingQueue<TextMessage> messageQueue;
+    private final BlockingQueue<TextMessage> messageQueue;
+
+    private final ConnectionMQ connectionMQ;
 
 
-    volatile StopWatch time = new StopWatch();
+    private final StopWatch timer = new StopWatch();
 
-    AtomicInteger sendMessageCounter = new AtomicInteger(0);
+    private final AtomicInteger sendMessageCounter = new AtomicInteger(0);
 
-    MessageStream messageStream;
+    private final MessageStream messageStream;
+
+    private boolean isInit = false;
 
 
-    int threads;
+    private final int threads;
 
-    CountDownLatch latch;
+    private final CountDownLatch latch;
 
-    Config config;
 
-    public Producer( Config config, BlockingQueue<TextMessage> queue, MessageStream messageStream, int threads) throws JMSException {
-        this.config = config;
+    public Producer(ConnectionMQ connectionMQ, BlockingQueue<TextMessage> queue, MessageStream messageStream, int threads)  {
+        this.connectionMQ = connectionMQ;
         this.messageQueue = queue;
         this.messageStream = messageStream;
         this.threads = threads;
@@ -40,10 +42,13 @@ public class Producer implements Runnable{
 
     }
 
-
     public void start() throws JMSException {
-        time.restart();
+
+        isInit = true;
+        timer.restart();
+        logger.debug("Starting MessageStream thread.");
         new Thread(messageStream).start();
+        logger.debug("Starting Producer threads.");
         for (int i = 0; i < threads; i++){
             new Thread(this).start();
         }
@@ -54,43 +59,63 @@ public class Producer implements Runnable{
             Thread.currentThread().interrupt();
         }
 
+        connectionMQ.closeConnection();
+
         logger.debug("Done! Send messages number = {}", sendMessageCounter);
-        logger.debug("Time execution = {} ms", time.taken());
-        logger.info("Send messages rps={}", (sendMessageCounter.doubleValue() / time.taken()) * 1000);
+        logger.debug("Time execution = {} ms", timer.taken());
+        logger.info("Send messages rps={}", (sendMessageCounter.doubleValue() / timer.taken()) * 1000);
     }
 
     @Override
     public void run() {
-        ConnectionMQ connectionMQ;
-        try {
-            connectionMQ = new ConnectionMQ(config);
-            logger.debug("Create connection to ActiveMQ.");
-        } catch (JMSException e) {
-            throw new RuntimeException(e);
-        }
+        if(!isInit){
+            init();
+        }else{
+            logger.debug("Producer thread starting.");
+            Session session = connectionMQ.createSession();
 
-        if(connectionMQ.getSession() != null){
-            logger.debug("Create Producer.");
-            try {
-                MessageProducer  producer = connectionMQ.getSession().createProducer(connectionMQ.getQueue());
-                producer.setDeliveryMode(DeliveryMode.PERSISTENT);
-                sendMessage(producer, connectionMQ);
-                logger.debug("Producer created");
-            } catch (JMSException e) {
-                logger.error("Can't create Producer.", e);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            logger.debug("Creating MessageProducer.");
+            if(session != null){
+                Queue queue = connectionMQ.createQueue(session);
+                if(queue != null){
+                    try {
+                        MessageProducer  producer = session.createProducer(queue);
+                        producer.setDeliveryMode(DeliveryMode.PERSISTENT);
+                        logger.debug("MessageProducer created");
+
+                        sendMessage(producer);
+                        producer.send( session.createTextMessage("END"));
+                        logger.debug("MessageProducer send Poison Pill");
+                        producer.close();
+                        logger.debug("MessageProducer closed.");
+                        session.close();
+                        logger.debug("MessageProducer session closed.");
+
+                    } catch (JMSException e) {
+                        logger.error("Can't create Producer or send message.", e);
+                    } catch (InterruptedException e) {
+                        logger.error("Producer send process interrupted");
+                        Thread.currentThread().interrupt();
+                    }
+
+                    latch.countDown();
+                }
             }
+
         }
-        try {
-            connectionMQ.closeConnection();
-        } catch (JMSException e) {
-            throw new RuntimeException(e);
-        }
-        latch.countDown();
     }
 
-    private void sendMessage(MessageProducer producer, ConnectionMQ connectionMQ) throws InterruptedException, JMSException {
+    private void init() {
+        try {
+            logger.debug("Init Producer.");
+            start();
+        } catch (JMSException e) {
+            logger.error("Can't init Producer threads.");
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void sendMessage(MessageProducer producer) throws InterruptedException, JMSException {
         int localCounter = 0;
         logger.debug("Start reading and sending messages.");
         while(messageStream.isRunning()) {
@@ -100,7 +125,6 @@ public class Producer implements Runnable{
                     localCounter++;
             }
         }
-        connectionMQ.getSession().createTextMessage("END");
         logger.debug("This thread done! Send messages number = {}", localCounter);
     }
 }
