@@ -1,6 +1,5 @@
 package shpp.level2.message;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import shpp.level2.validation.ValidName;
@@ -12,15 +11,17 @@ public class MessagePojo {
     @NotNull
     @ValidName(nameLength = 7)
     private String name;
-    @Min(value = 10)
+    @Min(value = 10, message = "Message.count value should be equal or higher than {value}")
     private int count;
-    //private LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
-    public MessagePojo(String name, int count){
+    public MessagePojo(String name, int count, LocalDateTime createdAt){
         this.name = name;
         this.count = count;
-        //this.createdAt = createdAt;
+        this.createdAt = createdAt;
     }
+
+    public MessagePojo(){};
     public String getName() {
         return name;
     }
@@ -37,11 +38,11 @@ public class MessagePojo {
         this.count = count;
     }
 
-   // public LocalDateTime getCreatedAt() {
-   //     return createdAt;
-   // }
+   public LocalDateTime getCreatedAt() {
+        return createdAt;
+   }
 
-    //public void setCreatedAt(LocalDateTime createdAt) {
-       // this.createdAt = createdAt;
-    //}
+    public void setCreatedAt(LocalDateTime createdAt) {
+       this.createdAt = createdAt;
+    }
 }

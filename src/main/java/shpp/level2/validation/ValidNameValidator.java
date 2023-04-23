@@ -3,7 +3,6 @@ package shpp.level2.validation;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
-import java.nio.charset.Charset;
 
 public class ValidNameValidator implements ConstraintValidator<ValidName, String> {
 

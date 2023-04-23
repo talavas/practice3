@@ -6,16 +6,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.jms.*;
+import java.lang.IllegalStateException;
 
 public class ConnectionMQ {
 
     private static final Logger logger = LoggerFactory.getLogger(ConnectionMQ.class);
 
-    public Queue getQueue() {
-        return queue;
-    }
+   // public Queue getQueue() {
+    //    return queue;
+   // }
 
-    private final Queue queue;
+    //private final Queue queue;
 
 
     private final ConnectionFactory connectionFactory;
@@ -26,17 +27,39 @@ public class ConnectionMQ {
 
     private final Connection connection;
 
-    public Session getSession() {
-        return session;
+    private  Config config;
+
+    public String getQueueName() {
+        return queueName;
     }
 
-    private final Session session;
+    private String queueName;
+
+
 
     public ConnectionMQ(Config config) throws JMSException {
+        this.queueName = config.getProperty("activemq.queue.name");
+        this.config = config;
         this.connectionFactory = ConnectionMQ.getConnectionFactory(config);
         this.connection = ConnectionMQ.createConnection(config);
-        this.session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-        this.queue = session.createQueue(config.getProperty("activemq.queue.name"));
+        logger.info("New connection to ActiveMQ created");
+    }
+
+    public Session createSession() {
+        try {
+            return this.connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        } catch (JMSException e) {
+            return null;
+        }
+    }
+
+    public Queue createQueue(Session session){
+        try {
+            return session.createQueue(getQueueName());
+        } catch (JMSException e) {
+           logger.error("Can't create queue within session");
+        }
+        return null;
     }
 
     public static ConnectionFactory getConnectionFactory(Config config) {
@@ -45,11 +68,6 @@ public class ConnectionMQ {
         String password = config.getProperty("activemq.password");
         ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(userName, password, brokerUrl);
         return connectionFactory;
-    }
-
-    public static ActiveMQQueue getQueue(Config config) throws JMSException {
-        String queueName = config.getProperty("activemq.queueName");
-        return new ActiveMQQueue(queueName);
     }
 
     public static Connection createConnection(Config config)  {
@@ -68,7 +86,6 @@ public class ConnectionMQ {
     }
 
     public void closeConnection() throws JMSException {
-        this.session.close();
         this.connection.close();
     }
 
