@@ -11,7 +11,7 @@ public class MessagePojo {
     @NotNull
     @ValidName(nameLength = 7)
     private String name;
-    @Min(value = 10, message = "Message.count value should be equal or higher than {value}")
+    @Min(value = 10, message = " Count should be equal or higher than {value}")
     private int count;
     private LocalDateTime createdAt;
 

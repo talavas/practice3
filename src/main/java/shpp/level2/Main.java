@@ -26,6 +26,7 @@ public class Main {
         }
         Config config = new Config();
 
+
         ConnectionMQ connectionProducer = new ConnectionMQ(config);
         ConnectionMQ connectionConsumer = new ConnectionMQ(config);
 
@@ -44,11 +45,25 @@ public class Main {
 
         CSVWriter<MessagePojo> validFileWriter = new ValidMessageCSVWriterImp(validator, "valid.csv", validMessages);
         CSVWriter<InvalidMessageDTO> invalidFileWriter = new InvalidMessageCSVWriterImp(validator, "invalid.csv", invalidMessages);
-        new Thread(producer).start();
-        new Thread(consumer).start();
-        new Thread(validator).start();
-        new Thread(validFileWriter).start();
-        new Thread(invalidFileWriter).start();
+        String type = System.getProperty("type", "all");
+        if(type.equals("producer")){
+            connectionConsumer.closeConnection();
+            new Thread(producer).start();
+        } else if (type.equals("consumer")) {
+            connectionProducer.closeConnection();
+            new Thread(consumer).start();
+            new Thread(validator).start();
+            new Thread(validFileWriter).start();
+            new Thread(invalidFileWriter).start();
+        }else {
+            new Thread(producer).start();
+            new Thread(consumer).start();
+            new Thread(validator).start();
+            new Thread(validFileWriter).start();
+            new Thread(invalidFileWriter).start();
+        }
+
+
 
     }
 }
