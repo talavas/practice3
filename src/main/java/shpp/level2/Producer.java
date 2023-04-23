@@ -7,8 +7,9 @@ import shpp.level2.message.MessageStream;
 import shpp.level2.util.ConnectionMQ;
 
 import javax.jms.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Producer implements Runnable{
@@ -32,6 +33,8 @@ public class Producer implements Runnable{
 
     private final CountDownLatch latch;
 
+    ExecutorService executorService;
+
 
     public Producer(ConnectionMQ connectionMQ, BlockingQueue<TextMessage> queue, MessageStream messageStream, int threads)  {
         this.connectionMQ = connectionMQ;
@@ -39,7 +42,11 @@ public class Producer implements Runnable{
         this.messageStream = messageStream;
         this.threads = threads;
         this.latch = new CountDownLatch(threads);
-
+        this.executorService = new ThreadPoolExecutor(threads, threads,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     public void start() throws JMSException {
@@ -49,14 +56,17 @@ public class Producer implements Runnable{
         logger.debug("Starting MessageStream thread.");
         new Thread(messageStream).start();
         logger.debug("Starting Producer threads.");
-        for (int i = 0; i < threads; i++){
-            new Thread(this).start();
+
+        for (int i = 0; i < threads; i++) {
+            executorService.execute(this);
         }
 
         try {
             latch.await();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }finally {
+            executorService.shutdown();
         }
 
         connectionMQ.closeConnection();
@@ -83,13 +93,8 @@ public class Producer implements Runnable{
                         producer.setDeliveryMode(DeliveryMode.PERSISTENT);
                         logger.debug("MessageProducer created");
 
-                        sendMessage(producer);
-                        producer.send( session.createTextMessage("END"));
-                        logger.debug("MessageProducer send Poison Pill");
-                        producer.close();
-                        logger.debug("MessageProducer closed.");
-                        session.close();
-                        logger.debug("MessageProducer session closed.");
+                        sendMessage(producer, session);
+
 
                     } catch (JMSException e) {
                         logger.error("Can't create Producer or send message.", e);
@@ -115,16 +120,48 @@ public class Producer implements Runnable{
         }
     }
 
-    private void sendMessage(MessageProducer producer) throws InterruptedException, JMSException {
+    private void sendMessage(MessageProducer producer, Session session) throws InterruptedException, JMSException {
         int localCounter = 0;
         logger.debug("Start reading and sending messages.");
-        while(messageStream.isRunning()) {
-            while (!messageQueue.isEmpty()){
-                    producer.send(messageQueue.take());
-                    sendMessageCounter.incrementAndGet();
-                    localCounter++;
+        List<TextMessage> batch = new ArrayList<>();
+
+        while(messageStream.isRunning() || !messageQueue.isEmpty()) {
+            int count = messageQueue.drainTo(batch, 100);
+            if (count == 0) {
+                Thread.sleep(1); // Затримуємо потік на 1 мілісекунду, щоб не займати зайвої процесорної потужності.
+                continue;
             }
+
+                logger.debug("Send batch = {}", batch.size());
+                sendBatch(producer, batch);
+                sendMessageCounter.addAndGet(batch.size());
+                localCounter += batch.size();
+                batch.clear();
+
         }
+        if (!batch.isEmpty()) {
+            logger.debug("Send batch = {}", batch.size());
+            sendBatch(producer, batch);
+            sendMessageCounter.addAndGet(batch.size());
+            localCounter += batch.size();
+            batch.clear();
+        }
+        producer.send( session.createTextMessage("END"));
+        logger.debug("MessageProducer send Poison Pill");
+
+        logger.debug("Closing producer.");
+        producer.close();
+        session.close();
+
         logger.debug("This thread done! Send messages number = {}", localCounter);
+    }
+    private void sendBatch(MessageProducer producer, List<TextMessage> batch) {
+        batch.stream().forEach(message -> {
+            try {
+                producer.send(message);
+            } catch (JMSException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 }

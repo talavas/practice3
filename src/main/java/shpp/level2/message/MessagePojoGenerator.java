@@ -20,7 +20,7 @@ public class MessagePojoGenerator {
 
     private static final int MAX_LENGTH = 15;
 
-    private static final int MAX_COUNT = 30;
+    private static final int MAX_COUNT = 50;
 
     private MessagePojoGenerator(){
         throw new IllegalStateException("Utility class");
