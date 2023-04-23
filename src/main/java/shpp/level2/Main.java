@@ -1,20 +1,21 @@
 package shpp.level2;
 
+import shpp.level2.message.InvalidMessageDTO;
 import shpp.level2.message.MessagePojo;
 import shpp.level2.message.MessageStream;
-import shpp.level2.util.CSVFileWriter;
-import shpp.level2.util.Config;
-import shpp.level2.util.ConnectionMQ;
+import shpp.level2.message.MessageValidator;
+import shpp.level2.util.*;
 
 import javax.jms.JMSException;
 import javax.jms.TextMessage;
+import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Main {
 
     private static final long DEFAULT_MESSAGE_NUMBERS = 10;
-    public static void main(String[] args) throws JMSException {
+    public static void main(String[] args) throws JMSException, IOException {
         long counter = DEFAULT_MESSAGE_NUMBERS;
         int theads = 1;
         if(args.length == 2){
@@ -29,16 +30,25 @@ public class Main {
         ConnectionMQ connectionConsumer = new ConnectionMQ(config);
 
         BlockingQueue<TextMessage> producerQueue = new LinkedBlockingQueue<>();
-        BlockingQueue<String> consumerQueue = new LinkedBlockingQueue<>();
+        BlockingQueue<MessagePojo> consumerQueue = new LinkedBlockingQueue<>();
 
         MessageStream messageStream = new MessageStream(connectionProducer, config, producerQueue, counter);
         Producer producer = new Producer(connectionProducer, producerQueue, messageStream, theads);
 
 
         Consumer consumer = new Consumer(connectionConsumer, consumerQueue, theads);
-        CSVFileWriter fileWriter = new CSVFileWriter(consumerQueue, consumer, theads);
+        BlockingQueue<MessagePojo> validMessages = new LinkedBlockingQueue<>();
+        BlockingQueue<InvalidMessageDTO> invalidMessages = new LinkedBlockingQueue<>();
+        MessageValidator validator = new MessageValidator(consumer, validMessages, invalidMessages);
+
+
+        CSVWriter<MessagePojo> validFileWriter = new ValidMessageCSVWriterImp(validator, "valid.csv", validMessages);
+        CSVWriter<InvalidMessageDTO> invalidFileWriter = new InvalidMessageCSVWriterImp(validator, "invalid.csv", invalidMessages);
         new Thread(producer).start();
         new Thread(consumer).start();
+        new Thread(validator).start();
+        new Thread(validFileWriter).start();
+        new Thread(invalidFileWriter).start();
 
     }
 }

@@ -2,6 +2,7 @@ package shpp.level2.message;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.time.LocalDateTime;
@@ -13,10 +14,11 @@ public class MessagePojoGenerator {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     static {
         objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
     private static final Random random = new Random();
 
-    private static final int MAX_LENGTH = 10;
+    private static final int MAX_LENGTH = 15;
 
     private static final int MAX_COUNT = 30;
 
@@ -27,14 +29,15 @@ public class MessagePojoGenerator {
 
     public static MessagePojo generateMessage(){
         return new MessagePojo(
-              generateRandomString(MAX_LENGTH),
+              generateRandomString(),
                 random.nextInt(MAX_COUNT),
                 LocalDateTime.now()
         );
     }
-    private  static String generateRandomString(int length) {
+    private  static String generateRandomString() {
+        int length  = random.nextInt(MAX_LENGTH);
         return random.ints('a', 'z' + 1)
-                .limit(length)
+                .limit(length + 1)
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
     }

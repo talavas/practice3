@@ -22,14 +22,18 @@ public class Consumer implements Runnable {
 
     private AtomicInteger receivedMessageCounter = new AtomicInteger(0);
 
-    private BlockingQueue<String> messageQueue;
+    public BlockingQueue<MessagePojo> getMessageQueue() {
+        return messageQueue;
+    }
 
-    private boolean isRunning = true;
+    private BlockingQueue<MessagePojo> messageQueue;
+
+    public boolean isRunning = true;
 
 
 private boolean isInit = false;
     CountDownLatch latch;
-    public Consumer(ConnectionMQ connectionMQ, BlockingQueue<String> queue, int threads) {
+    public Consumer(ConnectionMQ connectionMQ, BlockingQueue<MessagePojo> queue, int threads) {
         this.connectionMQ = connectionMQ;
         this.messageQueue = queue;
         this.latch = new CountDownLatch(threads);
@@ -97,21 +101,28 @@ private boolean isInit = false;
 
     }
 
-    private void receiveMessages(MessageConsumer consumer) throws JMSException {
+    private void receiveMessages(MessageConsumer consumer) throws JMSException{
         while (true) {
             Message message = consumer.receive();
             String text = null;
+            MessagePojo messagePojo;
             if (message != null) {
                 if (message instanceof TextMessage) {
                     text = ((TextMessage) message).getText();
-                    messageQueue.add(text);
+                    if(text != null && text.equals("END")){
+                        logger.debug("Receive poisson pill");
+                        break;
+                    }
+                    try {
+                        messagePojo = MessagePojoGenerator.toMessagePojo(text);
+                        messageQueue.add(messagePojo);
+                        receivedMessageCounter.incrementAndGet();
+                    } catch (JsonProcessingException e) {
+                        logger.error("Received message {} can't convert to MessagePojo class", text, e);
+                    }
+
                 }
-                if(text.equals("END")){
-                    logger.debug("Receive poisson pill");
-                    break;
-                }else{
-                    receivedMessageCounter.incrementAndGet();
-                }
+
             }
         }
     }

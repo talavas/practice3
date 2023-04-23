@@ -8,12 +8,10 @@ import shpp.level2.util.Config;
 import shpp.level2.util.ConnectionMQ;
 
 import javax.jms.JMSException;
-import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
