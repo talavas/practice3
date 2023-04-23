@@ -47,7 +47,7 @@ public class ConnectionMQ {
 
     public Session createSession() {
         try {
-            return this.connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            return this.connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
         } catch (JMSException e) {
             return null;
         }
@@ -66,8 +66,7 @@ public class ConnectionMQ {
         String brokerUrl = config.getProperty("activemq.brokerUrl");
         String userName = config.getProperty("activemq.userName");
         String password = config.getProperty("activemq.password");
-        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(userName, password, brokerUrl);
-        return connectionFactory;
+        return new ActiveMQConnectionFactory(userName, password, brokerUrl);
     }
 
     public static Connection createConnection(Config config)  {

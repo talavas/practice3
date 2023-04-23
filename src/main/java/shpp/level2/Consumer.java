@@ -98,13 +98,14 @@ private boolean isInit = false;
             }
             latch.countDown();
         }
-
     }
 
     private void receiveMessages(MessageConsumer consumer) throws JMSException{
+        Message message;
+        String text;
+
         while (true) {
-            Message message = consumer.receive();
-            String text = null;
+            message = consumer.receive();
             MessagePojo messagePojo;
             if (message != null) {
                 if (message instanceof TextMessage) {
@@ -120,9 +121,7 @@ private boolean isInit = false;
                     } catch (JsonProcessingException e) {
                         logger.error("Received message {} can't convert to MessagePojo class", text, e);
                     }
-
                 }
-
             }
         }
     }
@@ -136,6 +135,4 @@ private boolean isInit = false;
             Thread.currentThread().interrupt();
         }
     }
-
-
 }
