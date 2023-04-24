@@ -25,6 +25,8 @@ public class Producer implements Runnable{
 
     private final AtomicInteger sendMessageCounter = new AtomicInteger(0);
 
+    private final AtomicInteger threadCounter = new AtomicInteger(0);
+
     private final MessageStream messageStream;
 
     private boolean isInit = false;
@@ -43,7 +45,7 @@ public class Producer implements Runnable{
         this.messageStream = messageStream;
         this.threads = threads;
         this.latch = new CountDownLatch(threads);
-        this.executorService = new ThreadPoolExecutor(threads, threads,
+        this.executorService = new ThreadPoolExecutor(10, 100,
                 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(),
                 Executors.defaultThreadFactory(),
@@ -55,21 +57,17 @@ public class Producer implements Runnable{
         timer.restart();
 
         logger.debug("Starting Producer Pool.");
-
-        for (int i = 0; i < threads; i++) {
-            executorService.execute(this);
-        }
+        executorService.execute(this);
 
         try {
-            latch.await();
+            executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }finally {
-            executorService.shutdown();
+            throw new RuntimeException(e);
         }
 
-        logger.debug("Done! Send messages number = {}", sendMessageCounter);
-        logger.debug("Time execution = {} ms", timer.taken());
+        sendPoissonPill();
+        logger.info("Done! Send messages number = {}", sendMessageCounter);
+        logger.info("Time execution = {} ms", timer.taken());
         logger.info("Send messages rps={}", (sendMessageCounter.doubleValue() / timer.taken()) * 1000);
     }
 
@@ -83,72 +81,69 @@ public class Producer implements Runnable{
                 Thread.currentThread().interrupt();
             } catch (JMSException e) {
                 logger.error("Can't send messages.", e);
-            }finally {
-                try {
-                    sendPoissonPill();
-                } catch (JMSException e) {
-                    throw new RuntimeException(e);
-                }
-                logger.debug("Latch countDown {}", latch.getCount());
-                latch.countDown();
-                }
+            }
 
     }
 
     private void sendMessage() throws InterruptedException, JMSException {
-        int localCounter = 0;
         logger.debug("Start reading and sending messages.");
-        List<TextMessage> batch = new ArrayList<>();
+        List<TextMessage> batch = null;
 
         while(messageStream.isRunning() || !messageQueue.isEmpty()) {
-
-            int count = messageQueue.drainTo(batch, 1000);
+            batch = new ArrayList<>();
+            int count = messageQueue.drainTo(batch, 100);
             if (count == 0) {
                 Thread.sleep(1); // Затримуємо потік на 1 мілісекунду, щоб не займати зайвої процесорної потужності.
                 continue;
             }
-                logger.debug("Send batch = {}", batch.size());
+                logger.info("Prepared batch = {}", batch.size());
                 sendBatch(new ArrayList<>(batch));
-                localCounter += batch.size();
                 batch.clear();
         }
-        if (!batch.isEmpty()) {
+        if (batch != null && !batch.isEmpty()) {
             logger.debug("Send last batch = {}", batch.size());
             sendBatch(new ArrayList<>(batch));
-            sendMessageCounter.addAndGet(batch.size());
-            localCounter += batch.size();
             batch.clear();
         }
 
-        logger.debug("This thread done! Send messages number = {}", localCounter);
+        while (threadCounter.get() > 0){
+            Thread.sleep(1);
+        }
+        logger.info("Executor Service shutDown.");
+        executorService.shutdown();
+
     }
     private void sendBatch(List<TextMessage> batch) throws JMSException {
-        ConnectionMQ connectionMQ = new ConnectionMQ(config);
-        Session session = connectionMQ.createSession();
-        Queue queue = connectionMQ.createQueue(session);
+        threadCounter.incrementAndGet();
+        executorService.submit(() -> {
+            logger.info("New thread created {}", threadCounter.get());
+            try {
+                ConnectionMQ connectionMQ = new ConnectionMQ(config);
+                Session session = connectionMQ.createSession();
+                Queue queue = connectionMQ.createQueue(session);
+                MessageProducer producer = session.createProducer(queue);
+                batch.forEach(message -> {
+                    try {
+                        producer.send(message);
+                    } catch (JMSException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                sendMessageCounter.addAndGet(batch.size());
+                threadCounter.decrementAndGet();
+                logger.info("Thread deleted");
+                logger.info("Batch sent {} messages", batch.size());
+                logger.debug("Closing producer.");
+                producer.close();
+                logger.debug("Closing session.");
+                session.close();
+                logger.debug("Closing connection.");
+                connectionMQ.closeConnection();
 
-        try {
-            MessageProducer producer = session.createProducer(queue);
-            batch.forEach(message -> {
-                try {
-                    producer.send(message);
-                } catch (JMSException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            sendMessageCounter.addAndGet(batch.size());
-            logger.debug("Batch sent {} messages", batch.size());
-            logger.debug("Closing producer.");
-            producer.close();
-            logger.debug("Closing session.");
-            session.close();
-            logger.debug("Closing connection.");
-            connectionMQ.closeConnection();
-
-        } catch (JMSException e) {
-            throw new RuntimeException(e);
-        }
-
+            } catch (JMSException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     public void sendPoissonPill() throws JMSException {
@@ -159,7 +154,7 @@ public class Producer implements Runnable{
         producer.setDeliveryMode(DeliveryMode.PERSISTENT);
         logger.debug("MessageProducer created");
         producer.send( session.createTextMessage("END"));
-        logger.debug("MessageProducer send Poison Pill");
+        logger.info("MessageProducer send Poison Pill");
         logger.debug("Closing producer.");
         producer.close();
         logger.debug("Closing session.");
