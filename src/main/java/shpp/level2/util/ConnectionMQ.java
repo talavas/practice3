@@ -47,7 +47,7 @@ public class ConnectionMQ {
 
     public Session createSession() {
         try {
-            return this.connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
+            return this.connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
         } catch (JMSException e) {
             return null;
         }

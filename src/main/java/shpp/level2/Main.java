@@ -34,7 +34,7 @@ public class Main {
         BlockingQueue<MessagePojo> consumerQueue = new LinkedBlockingQueue<>();
 
         MessageStream messageStream = new MessageStream(connectionProducer, config, producerQueue, counter);
-        Producer producer = new Producer(connectionProducer, producerQueue, messageStream, theads);
+        Producer producer = new Producer(config, producerQueue, messageStream, theads);
 
 
         Consumer consumer = new Consumer(connectionConsumer, consumerQueue, theads);
@@ -48,7 +48,8 @@ public class Main {
         String type = System.getProperty("type", "all");
         if(type.equals("producer")){
             connectionConsumer.closeConnection();
-            new Thread(producer).start();
+            new Thread(messageStream).start();
+          producer.start();
         } else if (type.equals("consumer")) {
             connectionProducer.closeConnection();
             new Thread(consumer).start();
@@ -62,8 +63,6 @@ public class Main {
             new Thread(validFileWriter).start();
             new Thread(invalidFileWriter).start();
         }
-
-
 
     }
 }

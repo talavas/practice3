@@ -1,2 +1,4 @@
 target/
 .idea/
+valid.csv
+invalid.csv

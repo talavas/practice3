@@ -69,6 +69,7 @@ public class MessageStream implements Runnable{
         isRunning = false;
         try {
             session.get().close();
+            connectionMQ.closeConnection();
             logger.debug("MessageStream session close.");
         } catch (JMSException e) {
             logger.error("JMS service issue:", e);
