@@ -21,7 +21,7 @@ public class MessagePojo {
         this.createdAt = createdAt;
     }
 
-    public MessagePojo(){};
+    public MessagePojo(){}
     public String getName() {
         return name;
     }

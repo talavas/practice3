@@ -1,6 +1,5 @@
 package shpp.level2.message;
 
-import jakarta.validation.constraints.Min;
 
 public class InvalidMessageDTO {
 
@@ -8,19 +7,19 @@ public class InvalidMessageDTO {
         return name;
     }
 
-    private String name;
+    private final String name;
 
     public int getCount() {
         return count;
     }
 
-    private int count;
+    private final int count;
 
     public String getErrors() {
         return errors;
     }
 
-    private String errors;
+    private final String errors;
 
     public InvalidMessageDTO(MessagePojo message, String errors) {
         this.name = message.getName();

@@ -21,28 +21,33 @@ public class ValidMessageCSVWriterImp extends CSVWriter<MessagePojo>{
 
     }
 
+    private final String[] headers = {"Name", "Count"};
+
     @Override
     public void run() {
         timer.restart();
         MessagePojo message;
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+                .setHeader(headers)
+                .build();
         try (
                 FileWriter fileWriter = new FileWriter(fileName);
-                CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT);
+                CSVPrinter csvPrinter = new CSVPrinter(fileWriter, csvFormat)
 
         ){
             logger.debug("Created CSVPrinter instance");
-            while (messageValidator.isRunning) {
+            while (messageValidator.isRunning()) {
                 while (!queue.isEmpty()){
                         message = queue.take();
                         csvPrinter.printRecord(message.getName(), message.getCount());
                         printedMessageCounter.incrementAndGet();
                 }
             }
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+        } catch (IOException | InterruptedException e) {logger.error("Error stack with FileWriter, CSVWriter, ThreadInterrupt.", e);
+           Thread.currentThread().interrupt();
         }
-        logger.debug("CSWWriter write {} valid messages", printedMessageCounter.get());
-        logger.debug("Time execution = {} ms", timer.taken());
+        logger.info("CSWWriter write {} valid messages", printedMessageCounter.get());
+        logger.info("Time execution = {} ms", timer.taken());
         logger.info("Writing valid messages rps={}", (printedMessageCounter.doubleValue() / timer.taken()) * 1000);
 
     }

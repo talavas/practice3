@@ -17,29 +17,35 @@ public class InvalidMessageCSVWriterImp extends CSVWriter<InvalidMessageDTO>{
         super(validator, filename, queue);
     }
 
+    private final String[] headers = {"Name", "Count", "Errors"};
+
     @Override
     public void run() {
         timer.restart();
         InvalidMessageDTO message;
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+                .setHeader(headers)
+                .build();
         try (
                 FileWriter fileWriter = new FileWriter(fileName);
-                CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT)
+                CSVPrinter csvPrinter = new CSVPrinter(fileWriter, csvFormat)
 
         ){
-            logger.debug("Created CSVPrinter instance");
-            while (messageValidator.isRunning) {
-                while (!queue.isEmpty()){
+            logger.debug("Created CSVPrinter instance for invalid message");
+            while (messageValidator.isRunning()){
+                while(!queue.isEmpty()) {
                     message = queue.take();
                     csvPrinter.printRecord(message.getName(), message.getCount(), message.getErrors());
                     printedMessageCounter.incrementAndGet();
                 }
             }
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            logger.error("Error stack with FileWriter, CSVWriter, ThreadInterrupt.", e);
+            Thread.currentThread().interrupt();
         }
-        logger.debug("CSWWriter write {} invalid messages", printedMessageCounter.get());
-        logger.debug("Time execution = {} ms", timer.taken());
-        logger.info("Writing valid messages rps={}", (printedMessageCounter.doubleValue() / timer.taken()) * 1000);
+        logger.info("CSWWriter write {} invalid messages", printedMessageCounter.get());
+        logger.info("Time execution = {} ms", timer.taken());
+        logger.info("Writing invalid messages rps={}", (printedMessageCounter.doubleValue() / timer.taken()) * 1000);
 
     }
 }

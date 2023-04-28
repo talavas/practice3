@@ -10,20 +10,19 @@ import shpp.level2.util.ConnectionMQ;
 import javax.jms.JMSException;
 import javax.jms.Session;
 import javax.jms.TextMessage;
-import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 public class MessageStream implements Runnable{
 
-    private static final Logger logger = LoggerFactory.getLogger(MessageStream.class);
+    private final Logger logger = LoggerFactory.getLogger(MessageStream.class);
 
-    private long maxMessageCounter;
+    private final long maxMessageCounter;
 
     BlockingQueue<TextMessage> messageQueue;
 
-    private int maxDuration;
+    private final int maxDuration;
 
     public boolean isRunning() {
         return isRunning;
@@ -35,7 +34,7 @@ public class MessageStream implements Runnable{
 
     ConnectionMQ connectionMQ;
 
-    AtomicInteger counter = new AtomicInteger(-1);
+    AtomicInteger counter = new AtomicInteger(0);
 
     public MessageStream(ConnectionMQ connectionMQ, Config config, BlockingQueue<TextMessage> queue, long maxMessageCounter)  {
         this.messageQueue =queue;
@@ -48,33 +47,43 @@ public class MessageStream implements Runnable{
     @Override
     public void run() {
         logger.info("Starting generate messages.");
-        Optional<Session> session = Optional.of(connectionMQ.createSession());
-        session.ifPresent(sessionInstance -> Stream.generate(MessagePojoGenerator::generateMessage)
+        Session session = connectionMQ.createSession();
+        if(session != null){
+            generateStream(session);
+            isRunning = false;
+            try {
+                session.close();
+                logger.debug("MessageStream session close.");
+            } catch (JMSException e) {
+                logger.error("JMS service issue:", e);
+            }
+            logger.debug("Generated messages number = {}", counter);
+            logger.debug("Time execution = {} ms", timer.taken());
+            logger.debug("Generate messages rps={}", (counter.doubleValue() / timer.taken()) * 1000);
+        }else{
+            logger.error("Can't create session.");
+        }
+
+    }
+
+    void generateStream(Session session) {
+        Stream.generate(MessagePojoGenerator::generateMessage)
                 .takeWhile(message ->
                         timer.taken() / 1000 < maxDuration &&
-                                counter.incrementAndGet() < maxMessageCounter
+                                counter.get() < maxMessageCounter
                 )
                 .forEach(message -> {
                     try {
-                        TextMessage textMessage = sessionInstance.createTextMessage(MessagePojoGenerator.toJson(message));
+                        TextMessage textMessage = session.createTextMessage(MessagePojoGenerator.toJson(message));
                         messageQueue.add(textMessage);
+                        counter.incrementAndGet();
                     } catch (JsonProcessingException e) {
-                        logger.error("Can't proceed jsom parsing", e);
+                        logger.error("Can't proceed json parsing", e);
+                        Thread.currentThread().interrupt();
                     } catch (JMSException e) {
                         logger.error("Can't create JMS message");
+                        Thread.currentThread().interrupt();
                     }
-                })
-        );
-
-        isRunning = false;
-        try {
-            session.get().close();
-            logger.debug("MessageStream session close.");
-        } catch (JMSException e) {
-            logger.error("JMS service issue:", e);
-        }
-        logger.debug("Generated messages number = {}", counter);
-        logger.debug("Time execution = {} ms", timer.taken());
-        logger.debug("Generate messages rps={}", (counter.doubleValue() / timer.taken()) * 1000);
+                });
     }
 }

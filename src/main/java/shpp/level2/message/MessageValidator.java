@@ -11,8 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import shpp.level2.Consumer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MessageValidator implements Runnable{
@@ -25,59 +27,127 @@ public class MessageValidator implements Runnable{
     BlockingQueue<InvalidMessageDTO> invalidMessages;
     private final StopWatch timer = new StopWatch();
 
-    private AtomicInteger validatedMessageCounter = new AtomicInteger(0);
-    private AtomicInteger validMessageCounter = new AtomicInteger(0);
+    private final AtomicInteger validatedMessageCounter = new AtomicInteger(0);
+    private final AtomicInteger validMessageCounter = new AtomicInteger(0);
 
-    private AtomicInteger invalidMessageCounter = new AtomicInteger(0);
+    private final AtomicInteger invalidMessageCounter = new AtomicInteger(0);
+    public synchronized boolean isRunning() {
+        return isRunning;
+    }
 
-    public boolean isRunning = true;
-    private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    public MessageValidator(Consumer consumer, BlockingQueue<MessagePojo> validMessages, BlockingQueue<InvalidMessageDTO> invalidMessages) {
+    private boolean isRunning = true;
+    private final Validator validator;
+    private boolean isInit = false;
+
+    private final int threads;
+
+    private final CountDownLatch latch;
+
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
+    }
+
+    private int batchSize = 100;
+
+    private final ExecutorService executorService;
+    public MessageValidator(Consumer consumer, BlockingQueue<MessagePojo> validMessages, BlockingQueue<InvalidMessageDTO> invalidMessages, int threads) {
         this.consumer = consumer;
         this.receivedMessages = consumer.getMessageQueue();
         this.validMessages = validMessages;
         this.invalidMessages = invalidMessages;
-        logger.debug("Created new MessageValidator object");
+        this.latch = new CountDownLatch(threads);
+        this.threads = threads;
+        this.validator = Validation.buildDefaultValidatorFactory().getValidator();
+        this.executorService = new ThreadPoolExecutor(threads, threads,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.CallerRunsPolicy());
+        logger.debug("Created new MessageValidator pool");
     }
-
-    @Override
-    public void run() {
+    private void start() {
+        isInit = true;
         timer.restart();
-        logger.debug("Starting validate messages");
-        MessagePojo message;
-        InvalidMessageDTO invalidMessage;
-        while (consumer.isRunning) {
-            while (!receivedMessages.isEmpty()){
-                try {
-                   message = receivedMessages.take();
-                    Set<ConstraintViolation<MessagePojo>> violations = validator.validate(message);
-                    if (violations.isEmpty()) {
-                        validMessages.put(message);
-                        validMessageCounter.incrementAndGet();
-                    } else {
-                        invalidMessage = new InvalidMessageDTO(message, generateErrors(violations));
-                        invalidMessages.put(invalidMessage);
-                        invalidMessageCounter.incrementAndGet();
-                    }
-                    validatedMessageCounter.incrementAndGet();
-                } catch (InterruptedException e) {
-                    logger.error("Issue in thread.", e);
-                }
-            }
+        logger.debug("Starting MessageValidator threads.");
+        for (int i = 0; i < threads; i++) {
+            executorService.execute(this);
         }
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        finally {
+            executorService.shutdown();
+        }
+
+        isRunning = false;
         logger.debug("Validator stop validation, validate = {} messages", validatedMessageCounter.get());
         logger.debug("Valid messages = {}, invalid messages = {}", validMessageCounter.get(), invalidMessageCounter.get());
         logger.debug("Time execution = {} ms", timer.taken());
         logger.info("Validating messages rps={}", (validatedMessageCounter.doubleValue() / timer.taken()) * 1000);
-        isRunning = false;
+
     }
+
+    @Override
+    public void run() {
+        if(!isInit){
+            init();
+        }else{
+            logger.debug("MessageValidator thread {} started", Thread.currentThread().getName());
+            while (consumer.isRunning() || !receivedMessages.isEmpty()) {
+                List<MessagePojo> batch = new ArrayList<>();
+                int count = receivedMessages.drainTo(batch, batchSize);
+                if (count == 0) {
+                    continue;
+                }
+                logger.debug("Validating messages batch = {}", batch.size());
+                try {
+                    validateBatch(batch);
+                } catch (InterruptedException e) {
+                    logger.error("Can't validate messages");
+                    Thread.currentThread().interrupt();
+                }
+
+            }
+            latch.countDown();
+        }
+
+    }
+
+    private void validateBatch(List<MessagePojo> batch) throws InterruptedException {
+        batch.forEach(messagePojo -> {
+            Set<ConstraintViolation<MessagePojo>> violations = validator.validate(messagePojo);
+            if (violations.isEmpty()) {
+                if(validMessages.offer(messagePojo)){
+                    validMessageCounter.incrementAndGet();
+                }
+            } else {
+                if(invalidMessages.offer(new InvalidMessageDTO(messagePojo, generateErrors(violations)))){
+                    invalidMessageCounter.incrementAndGet();
+                }
+
+            }
+            validatedMessageCounter.incrementAndGet();
+        });
+        Thread.sleep(200);
+    }
+
     private String generateErrors(Set<ConstraintViolation<MessagePojo>> violations) {
         ObjectNode errorsNode = JsonNodeFactory.instance.objectNode();
         ArrayNode errorsArray = errorsNode.putArray("errors");
         for (ConstraintViolation<MessagePojo> violation : violations) {
-            errorsArray.add(violation.getPropertyPath() + " " + violation.getMessage());
+            errorsArray.add(violation.getMessage());
         }
         return errorsNode.toString();
     }
+
+    private void init() {
+        logger.debug("Init Consumer.");
+        start();
+    }
+
+
 }
 

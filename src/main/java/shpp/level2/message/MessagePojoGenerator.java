@@ -18,7 +18,7 @@ public class MessagePojoGenerator {
     }
     private static final Random random = new Random();
 
-    private static final int MAX_LENGTH = 15;
+    private static final int MAX_LENGTH = 30;
 
     private static final int MAX_COUNT = 50;
 
@@ -37,7 +37,7 @@ public class MessagePojoGenerator {
     private  static String generateRandomString() {
         int length  = random.nextInt(MAX_LENGTH);
         return random.ints('a', 'z' + 1)
-                .limit(length + 1)
+                .limit(length + 1L)
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
     }

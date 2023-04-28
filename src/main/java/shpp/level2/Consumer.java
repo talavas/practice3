@@ -9,43 +9,51 @@ import shpp.level2.message.MessagePojoGenerator;
 import shpp.level2.util.ConnectionMQ;
 
 import javax.jms.*;
-import java.util.Optional;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Consumer implements Runnable {
     private static final Logger logger = LoggerFactory.getLogger(Consumer.class);
-    private ConnectionMQ connectionMQ;
+    private final ConnectionMQ connectionMQ;
     private final StopWatch timer = new StopWatch();
-    private int threads;
-
-    private AtomicInteger receivedMessageCounter = new AtomicInteger(0);
-
+    private final int threads;
+    private final AtomicInteger receivedMessageCounter = new AtomicInteger(0);
     public BlockingQueue<MessagePojo> getMessageQueue() {
         return messageQueue;
     }
+    private final BlockingQueue<MessagePojo> messageQueue;
 
-    private BlockingQueue<MessagePojo> messageQueue;
-
-    public boolean isRunning = true;
-
-
-private boolean isInit = false;
+    public boolean isRunning() {
+        return isRunning;
+    }
+    private boolean isRunning = true;
+    private boolean isInit = false;
     CountDownLatch latch;
+    private final ExecutorService executorService;
+    public void setPoisonPill(String poisonPill) {
+        this.poisonPill = poisonPill;
+    }
+    private String poisonPill;
     public Consumer(ConnectionMQ connectionMQ, BlockingQueue<MessagePojo> queue, int threads) {
         this.connectionMQ = connectionMQ;
         this.messageQueue = queue;
         this.latch = new CountDownLatch(threads);
         this.threads = threads;
+        this.executorService = new ThreadPoolExecutor(threads, threads,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.CallerRunsPolicy());
+
     }
 
     public void start() throws JMSException {
         isInit = true;
         timer.restart();
 
+        logger.debug("Starting Consumer threads.");
         for (int i = 0; i < threads; i++) {
-            new Thread(this).start();
+            executorService.execute(this);
         }
 
         try {
@@ -53,11 +61,14 @@ private boolean isInit = false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+        finally {
+            executorService.shutdown();
+        }
         isRunning = false;
         logger.debug("Consumer stop receiving messages");
 
         connectionMQ.closeConnection();
-        logger.debug("ActiveMQ connection closed.");
+        logger.debug("Consumer ActiveMQ connection closed.");
 
         logger.debug("Done! Received messages number = {}", receivedMessageCounter.get());
         logger.debug("Time execution = {} ms", timer.taken());
@@ -106,24 +117,27 @@ private boolean isInit = false;
 
         while (true) {
             message = consumer.receive();
-            MessagePojo messagePojo;
-            if (message != null) {
-                if (message instanceof TextMessage) {
-                    text = ((TextMessage) message).getText();
-                    if(text != null && text.equals("END")){
-                        logger.debug("Receive poisson pill");
-                        break;
-                    }
-                    try {
-                        messagePojo = MessagePojoGenerator.toMessagePojo(text);
-                        messageQueue.add(messagePojo);
-                        receivedMessageCounter.incrementAndGet();
-                    } catch (JsonProcessingException e) {
-                        logger.error("Received message {} can't convert to MessagePojo class", text, e);
-                    }
+            if (isValid(message)) {
+                text = ((TextMessage) message).getText();
+
+                if(text.equals(poisonPill)){
+                    logger.debug("Receive poisson pill");
+                    break;
                 }
+                try {
+                    messageQueue.add(MessagePojoGenerator.toMessagePojo(text));
+                    receivedMessageCounter.incrementAndGet();
+                } catch (JsonProcessingException e) {
+                    logger.error("Received message {} can't convert to MessagePojo class", text, e);
+                }
+            }else{
+                logger.warn("Received message {} not valid TextMessage", message);
             }
         }
+    }
+
+    private boolean isValid(Message message) {
+        return message instanceof TextMessage;
     }
 
     private void init() {

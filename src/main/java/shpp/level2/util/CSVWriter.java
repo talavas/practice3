@@ -20,7 +20,7 @@ public abstract class CSVWriter<T> implements Runnable{
 
     protected AtomicInteger printedMessageCounter = new AtomicInteger(0);
 
-    public CSVWriter(MessageValidator validator, String fileName, BlockingQueue<T> queue) {
+    protected CSVWriter(MessageValidator validator, String fileName, BlockingQueue<T> queue) {
         this.fileName = fileName;
         this.queue = queue;
         this.messageValidator = validator;
