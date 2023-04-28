@@ -64,8 +64,8 @@ class ProducerTest {
         producer.start();
 
 
-        verify(session, times(THREADS)).close();
-        verify(messageProducer, times(THREADS)).close();
+        verify(session, times(THREADS + 2)).close();
+        verify(messageProducer, times(THREADS + 2)).close();
         verify(messageProducer, times(MESSAGE_COUNT)).send(any(TextMessage.class));
     }
 

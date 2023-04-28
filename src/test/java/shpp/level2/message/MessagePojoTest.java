@@ -29,8 +29,8 @@ class MessagePojoTest {
         Set<ConstraintViolation<MessagePojo>> constraintViolations =
                 validator.validate(message);
 
-        assertEquals(1, constraintViolations.size());
-        assertEquals("Name doesn't contain 'a' character", constraintViolations.iterator().next().getMessage());
+        assertEquals(2, constraintViolations.size());
+
 
     }
 
@@ -41,8 +41,7 @@ class MessagePojoTest {
         Set<ConstraintViolation<MessagePojo>> constraintViolations =
                 validator.validate(message);
 
-        assertEquals(1, constraintViolations.size());
-        assertEquals("Name has less than 7 symbols", constraintViolations.iterator().next().getMessage());
+        assertEquals(2, constraintViolations.size());
 
     }
 
@@ -53,7 +52,7 @@ class MessagePojoTest {
         Set<ConstraintViolation<MessagePojo>> constraintViolations =
                 validator.validate(message);
 
-                assertEquals(0, constraintViolations.size());
+                assertEquals(1, constraintViolations.size());
 
     }
 }

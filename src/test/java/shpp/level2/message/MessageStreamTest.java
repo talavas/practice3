@@ -74,6 +74,7 @@ class MessageStreamTest {
 
     @Test
     void generateStream_addsGeneratedMessagesToMessageQueue()  {
+        messageStream = new MessageStream(connectionMQ, config, messageQueue, maxMessageCounter);
         messageStream.generateStream(session);
         verify(messageQueue, times((int) maxMessageCounter)).add(any());
     }
