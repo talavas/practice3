@@ -1,9 +1,7 @@
 package shpp.level2.util;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import shpp.level2.message.MessagePojo;
@@ -34,7 +32,7 @@ class ValidMessageCSVWriterImpTest {
     }
 
     @Test
-    void run_writesValidMessagesToCSV() throws IOException {
+    void run_writesValidMessagesToCSV() {
         MessagePojo message = new MessagePojo("test name", 12, LocalDateTime.now());
         queue.add(message);
 

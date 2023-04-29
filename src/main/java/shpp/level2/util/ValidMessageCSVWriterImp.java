@@ -18,6 +18,7 @@ public class ValidMessageCSVWriterImp extends CSVWriter<MessagePojo>{
 
     public ValidMessageCSVWriterImp(MessageValidator validator, String filename, BlockingQueue<MessagePojo> queue) throws IOException {
         super(validator, filename, queue);
+        logger.info("Object ValidMessageCSVWriteImpl created.");
 
     }
 
@@ -43,7 +44,8 @@ public class ValidMessageCSVWriterImp extends CSVWriter<MessagePojo>{
                         printedMessageCounter.incrementAndGet();
                 }
             }
-        } catch (IOException | InterruptedException e) {logger.error("Error stack with FileWriter, CSVWriter, ThreadInterrupt.", e);
+        } catch (IOException | InterruptedException e) {
+            logger.error("Error stack with FileWriter, CSVWriter, ThreadInterrupt.", e);
            Thread.currentThread().interrupt();
         }
         logger.info("CSWWriter write {} valid messages", printedMessageCounter.get());

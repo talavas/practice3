@@ -92,7 +92,7 @@ public class Producer implements Runnable{
                     try {
                         logger.debug("Thread {}: Creating MessageProducer.", Thread.currentThread().getName());
                         MessageProducer  producer = session.createProducer(queue);
-                        producer.setDeliveryMode(DeliveryMode.PERSISTENT);
+                        producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
                         sendMessage(producer, session);
 

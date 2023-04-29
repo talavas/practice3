@@ -116,7 +116,7 @@ public class Consumer implements Runnable {
         String text;
 
         while (true) {
-            message = consumer.receive();
+            message = consumer.receive(2000);
             if (isValid(message)) {
                 text = ((TextMessage) message).getText();
 
