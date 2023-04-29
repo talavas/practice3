@@ -18,9 +18,9 @@ public class MessagePojoGenerator {
     }
     private static final Random random = new Random();
 
-    private static final int MAX_LENGTH = 30;
+    protected static final int MAX_LENGTH = 30;
 
-    private static final int MAX_COUNT = 50;
+    protected static final int MAX_COUNT = 50;
 
     private MessagePojoGenerator(){
         throw new IllegalStateException("Utility class");

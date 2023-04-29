@@ -36,23 +36,23 @@ class MessagePojoTest {
 
     @Test
     void testNotValidNameLength() {
-        MessagePojo message = new MessagePojo("Alex", 1, LocalDateTime.now());
+        MessagePojo message = new MessagePojo("Alex", 11, LocalDateTime.now());
 
         Set<ConstraintViolation<MessagePojo>> constraintViolations =
                 validator.validate(message);
 
-        assertEquals(2, constraintViolations.size());
+        assertEquals(1, constraintViolations.size());
 
     }
 
     @Test
     void testValidName() {
-        MessagePojo message = new MessagePojo("Alex Talavas", 1, LocalDateTime.now());
+        MessagePojo message = new MessagePojo("Alex Talavas", 12, LocalDateTime.now());
 
         Set<ConstraintViolation<MessagePojo>> constraintViolations =
                 validator.validate(message);
 
-                assertEquals(1, constraintViolations.size());
+                assertEquals(0, constraintViolations.size());
 
     }
 }
