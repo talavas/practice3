@@ -45,4 +45,13 @@ public class MessagePojo {
     public void setCreatedAt(LocalDateTime createdAt) {
        this.createdAt = createdAt;
     }
+
+    @Override
+    public String toString() {
+        return "MessagePojo{" +
+                "name='" + name +
+                ", count=" + count +
+                ", createdAt=" + createdAt +
+                '}';
+    }
 }

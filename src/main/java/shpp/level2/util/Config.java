@@ -17,7 +17,7 @@ public class Config {
     public Config() {
         properties = new Properties();
 
-        loadPropertiesFromClasspath(PROPERTIES_FILE_NAME);
+        loadPropertiesFromClasspath();
 
         if(properties.isEmpty()) {
             setDefaultProperties();
@@ -27,28 +27,26 @@ public class Config {
     public String getProperty(String key) {
         return properties.getProperty(key);
     }
-    private void loadPropertiesFromClasspath(String filePath) {
-        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath)
+    private void loadPropertiesFromClasspath() {
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(PROPERTIES_FILE_NAME)
         ) {
             if (inputStream != null) {
-                logger.debug("Load properties from '{}' file.", filePath);
+                logger.debug("Load properties from '{}' file.", PROPERTIES_FILE_NAME);
                 properties.load(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
             }else{
-                throw new IOException(filePath);
+                throw new IOException(PROPERTIES_FILE_NAME);
             }
         } catch (IOException e) {
-            logger.debug("Can't get properties from file {}.", filePath, e);
-            logger.warn("Can't load properties file '{}'", filePath);
+            logger.warn("Can't get properties from file {}.", PROPERTIES_FILE_NAME, e);
         }
     }
     private void setDefaultProperties() {
-        properties.setProperty("min", "1");
-        properties.setProperty("max", "10");
-        properties.setProperty("inc", "1");
+        properties.setProperty("stop.time", "5");
+        properties.setProperty("activemq.brokerUrl", "tcp://0.0.0.0:61616");
+        properties.setProperty("activemq.userName", "admin");
+        properties.setProperty("activemq.password", "admin");
+        properties.setProperty("activemq.queue.name", "test");
 
-        logger.warn("Set default properties min={}, max={}, inc={}",
-                properties.getProperty("min"),
-                properties.getProperty("max"),
-                properties.getProperty("inc"));
+        logger.warn("Set default properties.");
     }
 }

@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -17,34 +16,32 @@ import static org.mockito.Mockito.*;
 class MessageValidatorTest {
     @Mock
     private Consumer consumer;
-
+@Mock
     private BlockingQueue<MessagePojo> validMessages;
-    private BlockingQueue<InvalidMessageDTO> invalidMessages;
+@Mock
+private BlockingQueue<InvalidMessageDTO> invalidMessages;
     private MessageValidator messageValidator;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        validMessages = new LinkedBlockingQueue<>();
-        invalidMessages = new LinkedBlockingQueue<>();
+        when(validMessages.offer(any(MessagePojo.class))).thenReturn(true);
+        when(invalidMessages.offer(any(InvalidMessageDTO.class))).thenReturn(true);
+        messageValidator = new MessageValidator(consumer, validMessages, invalidMessages, 2);
+    }
+
+    @Test
+    void testRun() throws InterruptedException {
         List<MessagePojo> messages = new ArrayList<>();
         messages.add(new MessagePojo("test1", 10, LocalDateTime.now()));
         messages.add(new MessagePojo("test2", 2, LocalDateTime.now()));
         messages.add(new MessagePojo("test1aaaaa", 10, LocalDateTime.now()));
         messages.add(new MessagePojo("test2aaaaa", 20, LocalDateTime.now()));
+        messageValidator.validateBatch(messages);
 
-        when(consumer.getMessageQueue()).thenReturn(new LinkedBlockingQueue<>(messages));
-        when(consumer.isRunning()).thenReturn(true, false);
-        messageValidator = new MessageValidator(consumer, validMessages, invalidMessages, 2);
-    }
-
-    @Test
-    void testRun() {
-
-        messageValidator.run();
-
-        assertEquals(2, validMessages.size());
-        assertEquals(2, invalidMessages.size());
+       assertEquals(2, messageValidator.validMessageCounter.get());
+       assertEquals(2, messageValidator.invalidMessageCounter.get());
+       assertEquals(4, messageValidator.validatedMessageCounter.get());
     }
 
 }

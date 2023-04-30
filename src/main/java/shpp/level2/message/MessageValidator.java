@@ -28,9 +28,9 @@ public class MessageValidator implements Runnable{
     private final StopWatch timer = new StopWatch();
 
     protected final AtomicInteger validatedMessageCounter = new AtomicInteger(0);
-    private final AtomicInteger validMessageCounter = new AtomicInteger(0);
+    protected final AtomicInteger validMessageCounter = new AtomicInteger(0);
 
-    private final AtomicInteger invalidMessageCounter = new AtomicInteger(0);
+    protected final AtomicInteger invalidMessageCounter = new AtomicInteger(0);
     public synchronized boolean isRunning() {
         return isRunning;
     }
@@ -117,7 +117,7 @@ public class MessageValidator implements Runnable{
 
     }
 
-    private void validateBatch(List<MessagePojo> batch) throws InterruptedException {
+    protected void validateBatch(List<MessagePojo> batch) throws InterruptedException {
         batch.forEach(messagePojo -> {
             Set<ConstraintViolation<MessagePojo>> violations = validator.validate(messagePojo);
             if (violations.isEmpty()) {

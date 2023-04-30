@@ -18,14 +18,13 @@ public class MessagePojoGenerator {
     }
     private static final Random random = new Random();
 
-    protected static final int MAX_LENGTH = 30;
+    protected static final int MAX_LENGTH = 50;
 
     protected static final int MAX_COUNT = 50;
 
     private MessagePojoGenerator(){
         throw new IllegalStateException("Utility class");
     }
-
 
     public static MessagePojo generateMessage(){
         return new MessagePojo(
@@ -46,8 +45,8 @@ public class MessagePojoGenerator {
         return objectMapper.writeValueAsString(message);
     }
 
-    public static MessagePojo toMessagePojo(String jsonMessage) throws JsonProcessingException {
-        return objectMapper.readValue(jsonMessage, MessagePojo.class);
+    public static MessagePojo toMessagePojo(String jsonString) throws JsonProcessingException {
+        return objectMapper.readValue(jsonString, MessagePojo.class);
     }
 
 }
