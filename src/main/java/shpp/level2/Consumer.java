@@ -116,7 +116,7 @@ public class Consumer implements Runnable {
         String text;
 
         while (true) {
-            message = consumer.receive();
+            message = consumer.receiveNoWait();
             if (message instanceof TextMessage) {
                 text = ((TextMessage) message).getText();
 
@@ -131,8 +131,6 @@ public class Consumer implements Runnable {
                 } catch (JsonProcessingException e) {
                     logger.error("Received message {} can't convert to MessagePojo class", text, e);
                 }
-            }else{
-                logger.warn("Received message {} not valid TextMessage", message);
             }
         }
     }

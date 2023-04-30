@@ -47,7 +47,7 @@ class ConsumerTest {
         when(connectionMQ.createSession()).thenReturn(session);
         when(connectionMQ.createQueue(session)).thenReturn(queue);
         when(session.createConsumer(queue)).thenReturn(messageConsumer);
-        when(messageConsumer.receive(anyLong())).thenReturn(textMessage, textMessage);
+        when(messageConsumer.receiveNoWait()).thenReturn(textMessage);
         when(textMessage.getText()).thenReturn("{\"name\":\"hlrwtfuzncsxlf\",\"count\":27,\"createdAt\":\"2023-04-30T14:40:23.0389838\"}", "poison");
 
         consumer.run();
@@ -55,7 +55,7 @@ class ConsumerTest {
         verify(connectionMQ, times(1)).createSession();
         verify(connectionMQ, times(1)).createQueue(session);
         verify(session, times(1)).createConsumer(queue);
-        verify(messageConsumer, times(2)).receive(anyLong());
+        verify(messageConsumer, times(2)).receiveNoWait();
         verify(textMessage, times(2)).getText();
         verify(messageQueue, times(1)).offer(any(MessagePojo.class));
     }
