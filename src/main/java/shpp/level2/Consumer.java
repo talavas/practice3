@@ -28,7 +28,7 @@ public class Consumer implements Runnable {
     }
     private boolean isRunning = true;
     private boolean isInit = false;
-    CountDownLatch latch;
+    private final CountDownLatch latch;
     private final ExecutorService executorService;
     public void setPoisonPill(String poisonPill) {
         this.poisonPill = poisonPill;
@@ -70,9 +70,9 @@ public class Consumer implements Runnable {
         connectionMQ.closeConnection();
         logger.debug("Consumer ActiveMQ connection closed.");
 
-        logger.debug("Done! Received messages number = {}", receivedMessageCounter.get());
-        logger.debug("Time execution = {} ms", timer.taken());
-        logger.info("Received messages rps={}", (receivedMessageCounter.doubleValue() / timer.taken()) * 1000);
+        logger.info("Consumer done! Received messages number = {}", receivedMessageCounter.get());
+        logger.info("Time execution = {} ms", timer.taken());
+        logger.info("Consumer receive message rps={}", (receivedMessageCounter.doubleValue() / timer.taken()) * 1000);
     }
 
     @Override
@@ -116,8 +116,8 @@ public class Consumer implements Runnable {
         String text;
 
         while (true) {
-            message = consumer.receive(2000);
-            if (isValid(message)) {
+            message = consumer.receive();
+            if (message instanceof TextMessage) {
                 text = ((TextMessage) message).getText();
 
                 if(text.equals(poisonPill)){
@@ -125,8 +125,9 @@ public class Consumer implements Runnable {
                     break;
                 }
                 try {
-                    messageQueue.add(MessagePojoGenerator.toMessagePojo(text));
-                    receivedMessageCounter.incrementAndGet();
+                    if(messageQueue.offer(MessagePojoGenerator.toMessagePojo(text))){
+                        receivedMessageCounter.incrementAndGet();
+                    }
                 } catch (JsonProcessingException e) {
                     logger.error("Received message {} can't convert to MessagePojo class", text, e);
                 }
@@ -134,10 +135,6 @@ public class Consumer implements Runnable {
                 logger.warn("Received message {} not valid TextMessage", message);
             }
         }
-    }
-
-    private boolean isValid(Message message) {
-        return message instanceof TextMessage;
     }
 
     private void init() {

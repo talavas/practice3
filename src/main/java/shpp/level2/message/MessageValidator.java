@@ -27,7 +27,7 @@ public class MessageValidator implements Runnable{
     BlockingQueue<InvalidMessageDTO> invalidMessages;
     private final StopWatch timer = new StopWatch();
 
-    private final AtomicInteger validatedMessageCounter = new AtomicInteger(0);
+    protected final AtomicInteger validatedMessageCounter = new AtomicInteger(0);
     private final AtomicInteger validMessageCounter = new AtomicInteger(0);
 
     private final AtomicInteger invalidMessageCounter = new AtomicInteger(0);
@@ -35,7 +35,7 @@ public class MessageValidator implements Runnable{
         return isRunning;
     }
 
-    private boolean isRunning = true;
+    protected boolean isRunning = true;
     private final Validator validator;
     private boolean isInit = false;
 
@@ -58,7 +58,7 @@ public class MessageValidator implements Runnable{
         this.latch = new CountDownLatch(threads);
         this.threads = threads;
         this.validator = Validation.buildDefaultValidatorFactory().getValidator();
-        this.executorService = new ThreadPoolExecutor(threads, threads,
+        this.executorService = new ThreadPoolExecutor(threads * 2, threads * 2,
                 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(),
                 Executors.defaultThreadFactory(),
@@ -69,7 +69,7 @@ public class MessageValidator implements Runnable{
         isInit = true;
         timer.restart();
         logger.debug("Starting MessageValidator threads.");
-        for (int i = 0; i < threads; i++) {
+        for (int i = 0; i < threads * 2; i++) {
             executorService.execute(this);
         }
 
@@ -83,9 +83,9 @@ public class MessageValidator implements Runnable{
         }
 
         isRunning = false;
-        logger.debug("Validator stop validation, validate = {} messages", validatedMessageCounter.get());
-        logger.debug("Valid messages = {}, invalid messages = {}", validMessageCounter.get(), invalidMessageCounter.get());
-        logger.debug("Time execution = {} ms", timer.taken());
+        logger.info("Validator stop validation, validate = {} messages", validatedMessageCounter.get());
+        logger.info("Valid messages = {}, invalid messages = {}", validMessageCounter.get(), invalidMessageCounter.get());
+        logger.info("Time execution = {} ms", timer.taken());
         logger.info("Validating messages rps={}", (validatedMessageCounter.doubleValue() / timer.taken()) * 1000);
 
     }
@@ -112,6 +112,7 @@ public class MessageValidator implements Runnable{
 
             }
             latch.countDown();
+            logger.debug("MessageValidator thread {} stopped", Thread.currentThread().getName());
         }
 
     }
@@ -143,8 +144,8 @@ public class MessageValidator implements Runnable{
         return errorsNode.toString();
     }
 
-    private void init() {
-        logger.debug("Init Consumer.");
+    protected void init() {
+        logger.debug("Init MessageValidator.");
         start();
     }
 

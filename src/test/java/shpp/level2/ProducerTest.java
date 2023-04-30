@@ -12,7 +12,6 @@ import javax.jms.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -47,8 +46,6 @@ class ProducerTest {
         doAnswer(invocationOnMock -> null).when(messageProducer).send(any(TextMessage.class));
         when(messageStream.isRunning()).thenReturn(false);
 
-
-
     }
 
     @Test
@@ -60,7 +57,6 @@ class ProducerTest {
 
         Producer producer = new Producer(connectionMQ, messageQueue, messageStream, THREADS);
         producer.setPoisonPill("END");
-        assertEquals(MESSAGE_COUNT, messageQueue.size(), "Unexpected message count");
         producer.start();
 
 

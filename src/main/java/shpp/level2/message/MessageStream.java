@@ -57,9 +57,9 @@ public class MessageStream implements Runnable{
             } catch (JMSException e) {
                 logger.error("JMS service issue:", e);
             }
-            logger.debug("Generated messages number = {}", counter);
-            logger.debug("Time execution = {} ms", timer.taken());
-            logger.debug("Generate messages rps={}", (counter.doubleValue() / timer.taken()) * 1000);
+            logger.info("Generated messages number = {}", counter);
+            logger.info("Time execution = {} ms", timer.taken());
+            logger.info("Generate messages rps={}", (counter.doubleValue() / timer.taken()) * 1000);
         }else{
             logger.error("Can't create session.");
         }
